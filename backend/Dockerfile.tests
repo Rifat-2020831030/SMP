@@ -1,0 +1,10 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0
+
+WORKDIR /src
+COPY Directory.Build.props SchoolAdmission.sln ./
+COPY SchoolAdmission.Api/SchoolAdmission.Api.csproj SchoolAdmission.Api/packages.lock.json SchoolAdmission.Api/
+COPY SchoolAdmission.Api.Tests/SchoolAdmission.Api.Tests.csproj SchoolAdmission.Api.Tests/packages.lock.json SchoolAdmission.Api.Tests/
+RUN dotnet restore SchoolAdmission.sln --locked-mode
+COPY SchoolAdmission.Api/ SchoolAdmission.Api/
+COPY SchoolAdmission.Api.Tests/ SchoolAdmission.Api.Tests/
+CMD ["dotnet", "test", "SchoolAdmission.sln", "--no-restore"]

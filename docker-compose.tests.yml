@@ -1,0 +1,23 @@
+services:
+  test-db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: admission_test_admin
+      POSTGRES_USER: school_test
+      POSTGRES_PASSWORD: school_test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U school_test -d admission_test_admin"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  tests:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.tests
+    environment:
+      TEST_DATABASE_CONNECTION: Host=test-db;Port=5432;Database=admission_test_admin;Username=school_test;Password=school_test
+    depends_on:
+      test-db:
+        condition: service_healthy
+    command: ["dotnet", "test", "SchoolAdmission.sln", "--no-restore"]

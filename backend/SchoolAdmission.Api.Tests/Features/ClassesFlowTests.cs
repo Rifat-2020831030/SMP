@@ -40,6 +40,10 @@ public sealed class ClassesFlowTests
         var response = await factory.Client.GetAsync("/classes/unknown-class");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal(404, problem.RootElement.GetProperty("status").GetInt32());
+        Assert.False(string.IsNullOrWhiteSpace(problem.RootElement.GetProperty("detail").GetString()));
     }
 
     [Fact]
@@ -55,12 +59,43 @@ public sealed class ClassesFlowTests
     [Theory]
     [InlineData("", 1)]
     [InlineData("   ", 1)]
+    [InlineData("x", 0)]
     [InlineData("Class 6", 0)]
     [InlineData("Class 6", -1)]
+    [InlineData("Class 6", -2147483648)]
     public async Task InvalidClass_Returns400(string name, int totalSeats)
     {
         await using var factory = await AdmissionApiFactory.CreateAsync();
         var response = await factory.Client.PostAsJsonAsync("/classes", new { name, totalSeats });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(1, 1)]
+    [InlineData(200, 2147483647)]
+    public async Task ValidClassBoundaries_AreAccepted(int nameLength, int totalSeats)
+    {
+        await using var factory = await AdmissionApiFactory.CreateAsync();
+        var name = new string('x', nameLength);
+        var response = await factory.Client.PostAsJsonAsync("/classes", new { name, totalSeats });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("{")]
+    [InlineData("{}")]
+    [InlineData("{\"name\":null,\"totalSeats\":1}")]
+    [InlineData("{\"name\":\"A\",\"totalSeats\":\"1\"}")]
+    [InlineData("{\"name\":\"A\",\"totalSeats\":2147483648}")]
+    [InlineData("{\"name\":\"A\",\"totalSeats\":1.5}")]
+    public async Task InvalidClassPayload_Returns400(string json)
+    {
+        await using var factory = await AdmissionApiFactory.CreateAsync();
+        using var request = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+        var response = await factory.Client.PostAsync("/classes", request);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -105,6 +140,8 @@ public sealed class ClassesFlowTests
     public async Task Database_RejectsNegativeAndOverCapacityCounters()
     {
         await using var factory = await AdmissionApiFactory.CreateAsync();
+        using var client = factory.Client;
+        await client.GetAsync("/classes");
         await using var connection = new NpgsqlConnection(factory.ConnectionString);
         await connection.OpenAsync();
         await using (var insert = new NpgsqlCommand(
@@ -124,6 +161,8 @@ public sealed class ClassesFlowTests
     public async Task Database_RejectsDuplicateNormalizedClassName()
     {
         await using var factory = await AdmissionApiFactory.CreateAsync();
+        using var client = factory.Client;
+        await client.GetAsync("/classes");
         await using var connection = new NpgsqlConnection(factory.ConnectionString);
         await connection.OpenAsync();
         await using (var insert = new NpgsqlCommand(

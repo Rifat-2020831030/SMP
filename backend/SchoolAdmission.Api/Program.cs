@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using SchoolAdmission.Api.Features.Classes;
+using SchoolAdmission.Api.Infrastructure;
 using SchoolAdmission.Api.Data;
 using Serilog;
 using Serilog.Formatting.Json;
@@ -11,9 +13,11 @@ builder.Host.UseSerilog((context, configuration) => configuration
     .WriteTo.Console(new JsonFormatter()));
 
 builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddDbContext<AdmissionDbContext>(options => options.UseNpgsql(
     builder.Configuration.GetConnectionString("Database")
         ?? throw new InvalidOperationException("ConnectionStrings:Database is required.")));
+builder.Services.AddScoped<ClassQueries>();
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
@@ -24,7 +28,24 @@ app.UseSerilogRequestLogging();
 app.UseExceptionHandler();
 app.UseCors();
 
+await using (var scope = app.Services.CreateAsyncScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AdmissionDbContext>();
+    await db.Database.OpenConnectionAsync();
+    try
+    {
+        await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_lock(-2)");
+        await db.Database.MigrateAsync();
+    }
+    finally
+    {
+        await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_unlock(-2)");
+        await db.Database.CloseConnectionAsync();
+    }
+}
+
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+app.MapClassEndpoints();
 app.Run();
 
 public partial class Program;
