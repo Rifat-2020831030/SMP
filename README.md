@@ -6,6 +6,13 @@ The system enables school staff to create class and shift offerings with fixed s
 
 ---
 
+## Documentation
+
+- **[System Assumptions & Invariants (`ASSUMPTIONS.md`)](ASSUMPTIONS.md):** Architectural decisions, concurrency invariants, and specification trade-offs.
+- **[AI Usage Report (`AI_USAGE.md`)](AI_USAGE.md):** Multi-model workflow, tools utilized (`OpenAI Codex`, `Google Antigravity`), lifecycle diagram, and human engineering interventions.
+
+---
+
 ## Getting Started with Docker
 
 The entire platform—PostgreSQL database, backend API, and frontend web client—runs via Docker Compose without requiring any local runtimes or SDKs.
