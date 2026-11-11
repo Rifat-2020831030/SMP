@@ -1,0 +1,20 @@
+doc
+docs
+Asst_Software_Engineer_Project_Assignment.md
+
+# Local settings and generated artifacts
+.env
+.env.*
+!.env.example
+**/bin/
+**/obj/
+**/TestResults/
+**/node_modules/
+**/dist/
+**/coverage/
+**/playwright-report/
+**/test-results/
+.vs/
+.idea/
+*.user
+*.log
