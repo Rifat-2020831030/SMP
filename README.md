@@ -44,6 +44,7 @@ The entire platformâ€”PostgreSQL database, backend API, and frontend web clientâ
    | `POSTGRES_USER`     | `school`                | PostgreSQL username                          |
    | `POSTGRES_PASSWORD` | `school_dev`            | PostgreSQL password                          |
    | `POSTGRES_PORT`     | `5432`                  | Exposed PostgreSQL host port                 |
+   | `BACKEND_PORT`      | `8080`                  | Exposed Backend host port                    |
    | `FRONTEND_PORT`     | `5173`                  | Exposed Frontend host port                   |
    | `FRONTEND_ORIGIN`   | `http://localhost:5173` | Allowed CORS origin for backend API          |
    | `VITE_API_BASE_URL` | `http://localhost:8080` | Backend API URL embedded into frontend build |
