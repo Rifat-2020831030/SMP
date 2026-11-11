@@ -209,10 +209,33 @@ export function HoldPage() {
                 ভর্তির আবেদন (APPLICATION HOLD)
               </p>
               <h2 className="mt-1 text-3xl font-bold tracking-tight">{className}</h2>
-              <p className="mt-1 font-mono text-xs text-muted-foreground">হোল্ড আইডি: {hold.data.holdId}</p>
+              <div className="mt-1 flex items-center gap-2">
+                <span className="font-mono text-xs text-muted-foreground">হোল্ড আইডি: {hold.data.holdId}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(hold.data.holdId)
+                    alert('হোল্ড আইডি কপি করা হয়েছে!')
+                  }}
+                  className="rounded border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-muted"
+                >
+                  কপি
+                </button>
+              </div>
             </div>
             <StatusBadge status={effectiveStatus} />
           </div>
+
+          {hold.data.status === 'HELD' && secondsLeft !== null && secondsLeft <= 120 && secondsLeft > 0 && (
+            <div className="mt-5 rounded-lg border border-destructive/60 bg-destructive/15 p-4 text-sm text-destructive dark:text-red-200 animate-pulse">
+              <p className="font-bold flex items-center gap-1.5">
+                <span>⚠️ সতর্কতা:</span> ফি প্রদানের সময় শেষ হতে ২ মিনিটেরও কম বাকি রয়েছে!
+              </p>
+              <p className="mt-0.5 text-xs">
+                মেয়াদ শেষ হলে সিটটি স্বয়ংক্রিয়ভাবে বাতিল হয়ে যাবে। অবিলম্বে নিচের "ভর্তি ফি দিন" বাটনে চাপ দিন।
+              </p>
+            </div>
+          )}
 
           <div className="mt-6 rounded-xl bg-muted/50 p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

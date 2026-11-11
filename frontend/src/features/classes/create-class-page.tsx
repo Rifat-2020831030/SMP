@@ -121,6 +121,19 @@ export function CreateClassPage() {
               >
                 {errors.name ?? '১ থেকে ২০০ অক্ষরের মধ্যে নাম দিন। প্রতিটি শিফট আলাদা ক্লাস হিসেবে তৈরি হবে।'}
               </p>
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <span className="text-[11px] text-muted-foreground">নমুনা শিফট:</span>
+                {['Class 6 - Morning Shift', 'Class 6 - Day Shift', 'Class 7 - Morning Shift', 'Class 8 - Day Shift'].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setName(preset)}
+                    className="rounded-md border bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-foreground hover:bg-muted transition-colors"
+                  >
+                    + {preset}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -143,6 +156,19 @@ export function CreateClassPage() {
                 className="h-10"
               />
               {errors.seats && <p id="total-seats-error" className="text-xs text-destructive">{errors.seats}</p>}
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <span className="text-[11px] text-muted-foreground">সিট সংখ্যা:</span>
+                {[40, 60, 100, 120].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => setSeats(String(num))}
+                    className="rounded-md border bg-muted/60 px-2 py-0.5 text-[11px] font-medium text-foreground hover:bg-muted transition-colors"
+                  >
+                    {num} টি
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 

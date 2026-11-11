@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
+import { toBnDigits } from '@/lib/utils'
 import { useStudentId } from '@/lib/student-id'
 import { useClassesStream } from '@/lib/use-classes-stream'
 import { getMyHolds } from '@/features/holds/holds-api'
@@ -26,13 +27,31 @@ function ActiveHoldBanner({ hold }: { hold: StudentHold }) {
   const diffSeconds = Math.max(0, Math.floor((new Date(hold.expiresAt).getTime() - now) / 1000))
   if (diffSeconds <= 0) return null
 
+  const isUrgent = diffSeconds <= 120
+
   return (
-    <div className="rounded-xl border-2 border-amber-500/60 bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-transparent p-5 sm:p-6 shadow-md">
+    <div
+      className={`rounded-xl border-2 p-5 sm:p-6 shadow-md transition-all ${
+        isUrgent
+          ? 'border-destructive/70 bg-destructive/10 animate-pulse'
+          : 'border-amber-500/60 bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-transparent'
+      }`}
+    >
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3 py-1 text-xs font-semibold text-amber-900 dark:text-amber-200">
-            <span className="size-2 rounded-full bg-amber-500 animate-pulse" />
-            আপনার একটি চলমান আবেদন রয়েছে (Ongoing Application)
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
+              isUrgent
+                ? 'bg-destructive/20 text-destructive dark:text-red-300'
+                : 'bg-amber-500/20 text-amber-900 dark:text-amber-200'
+            }`}
+          >
+            <span
+              className={`size-2 rounded-full ${isUrgent ? 'bg-destructive animate-ping' : 'bg-amber-500 animate-pulse'}`}
+            />
+            {isUrgent
+              ? '🚨 মেয়াদ প্রায় শেষ! দ্রুত ভর্তি ফি দিন (Urgent)'
+              : 'আপনার একটি চলমান আবেদন রয়েছে (Ongoing Application)'}
           </span>
           <h3 className="mt-2 text-2xl font-bold tracking-tight text-foreground">{hold.className}</h3>
           <p className="mt-0.5 font-mono text-xs text-muted-foreground">Hold ID: {hold.holdId}</p>
@@ -43,12 +62,25 @@ function ActiveHoldBanner({ hold }: { hold: StudentHold }) {
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               ফি প্রদানের বাকি সময়
             </p>
-            <p className="mt-0.5 font-mono text-2xl font-extrabold text-amber-600 dark:text-amber-400">
+            <p
+              className={`mt-0.5 font-mono text-2xl font-extrabold ${
+                isUrgent ? 'text-destructive' : 'text-amber-600 dark:text-amber-400'
+              }`}
+            >
               {formatCountdown(diffSeconds)}
+              <span className="ml-1 text-xs font-normal text-muted-foreground">
+                ({toBnDigits(Math.floor(diffSeconds / 60))} মি. {toBnDigits(diffSeconds % 60)} সে.)
+              </span>
             </p>
           </div>
 
-          <Button asChild size="lg" className="h-11 px-6 font-bold shadow">
+          <Button
+            asChild
+            size="lg"
+            className={`h-11 px-6 font-bold shadow ${
+              isUrgent ? 'bg-destructive hover:bg-destructive/90 text-white' : ''
+            }`}
+          >
             <Link to={`/holds/${encodeURIComponent(hold.holdId)}`}>
               ভর্তি ফি দিন / বিস্তারিত →
             </Link>
@@ -138,37 +170,43 @@ export function ClassesPage() {
           {displayedClasses.map((item) => (
             <li
               key={item.id}
-              className="rounded-xl border bg-card p-5 sm:p-6 shadow-sm transition-all hover:border-foreground/30 hover:shadow-md"
+              className="group rounded-xl border bg-card p-5 sm:p-6 shadow-sm transition-all duration-200 hover:border-foreground/30 hover:shadow-md hover:-translate-y-0.5"
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <Link
                     to={`/classes/${encodeURIComponent(item.id)}`}
-                    className="text-xl font-bold text-foreground hover:underline"
+                    className="text-xl font-bold text-foreground group-hover:underline"
                   >
                     {item.name}
                   </Link>
                   <p className="mt-1 text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                    {item.availableSeats} টি সিট খালি আছে (Available)
+                    {item.availableSeats} টি সিট খালি ({toBnDigits(item.availableSeats)}/{toBnDigits(item.totalSeats)})
                   </p>
                 </div>
                 <span className="rounded-full bg-secondary px-3 py-1 font-mono text-xs font-semibold">
-                  খালি: {item.availableSeats}/{item.totalSeats}
+                  {item.availableSeats}/{item.totalSeats}
                 </span>
               </div>
 
               <dl className="mt-5 grid grid-cols-3 gap-2 rounded-lg bg-muted/40 p-3 text-center text-xs">
                 <div>
                   <dt className="text-muted-foreground">মোট (Total)</dt>
-                  <dd className="mt-1 font-mono text-base font-bold">{item.totalSeats}</dd>
+                  <dd className="mt-1 font-mono text-base font-bold">
+                    {item.totalSeats} <span className="text-[11px] font-normal text-muted-foreground">({toBnDigits(item.totalSeats)})</span>
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-muted-foreground">হোল্ড (Held)</dt>
-                  <dd className="mt-1 font-mono text-base font-bold text-amber-600 dark:text-amber-400">{item.heldSeats}</dd>
+                  <dd className="mt-1 font-mono text-base font-bold text-amber-600 dark:text-amber-400">
+                    {item.heldSeats} <span className="text-[11px] font-normal text-muted-foreground">({toBnDigits(item.heldSeats)})</span>
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-muted-foreground">নিশ্চিত (Confirmed)</dt>
-                  <dd className="mt-1 font-mono text-base font-bold text-blue-600 dark:text-blue-400">{item.confirmedSeats}</dd>
+                  <dd className="mt-1 font-mono text-base font-bold text-blue-600 dark:text-blue-400">
+                    {item.confirmedSeats} <span className="text-[11px] font-normal text-muted-foreground">({toBnDigits(item.confirmedSeats)})</span>
+                  </dd>
                 </div>
               </dl>
 
