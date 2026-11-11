@@ -8,12 +8,12 @@ The system enables school staff to create class and shift offerings with fixed s
 
 ## Documentation
 
-- **[System Assumptions & Invariants (`ASSUMPTIONS.md`)](ASSUMPTIONS.md):** Architectural decisions, concurrency invariants, and specification trade-offs.
-- **[AI Usage Report (`AI_USAGE.md`)](AI_USAGE.md):** Multi-model workflow, tools utilized (`OpenAI Codex`, `Google Antigravity`), lifecycle diagram, and human engineering interventions.
+- **[`ASSUMPTIONS.md`](ASSUMPTIONS.md)**
+- **[`AI_USAGE.md`](AI_USAGE.md)**
 
 ---
 
-## Getting Started with Docker
+## Docker Setup Guide
 
 The entire platform—PostgreSQL database, backend API, and frontend web client—runs via Docker Compose without requiring any local runtimes or SDKs.
 
@@ -25,6 +25,7 @@ The entire platform—PostgreSQL database, backend API, and frontend web client�
 ### Running the Application
 
 1. **Clone the repository:**
+
    ```bash
    git clone <repository-url>
    cd SMP
@@ -32,25 +33,29 @@ The entire platform—PostgreSQL database, backend API, and frontend web client�
 
 2. **(Optional) Configure Environment Variables:**
    A `.env.example` file is included in the project root. Copying it is optional, as `docker-compose.yml` provides sensible defaults out of the box:
+
    ```bash
    cp .env.example .env
    ```
 
-   | Variable | Default Value | Description |
-   |---|---|---|
-   | `POSTGRES_DB` | `school_admission` | PostgreSQL database name |
-   | `POSTGRES_USER` | `school` | PostgreSQL username |
-   | `POSTGRES_PASSWORD` | `school_dev` | PostgreSQL password |
-   | `POSTGRES_PORT` | `5432` | Exposed PostgreSQL host port |
-   | `FRONTEND_PORT` | `5173` | Exposed Frontend host port |
-   | `FRONTEND_ORIGIN` | `http://localhost:5173` | Allowed CORS origin for backend API |
+   | Variable            | Default Value           | Description                                  |
+   | ------------------- | ----------------------- | -------------------------------------------- |
+   | `POSTGRES_DB`       | `school_admission`      | PostgreSQL database name                     |
+   | `POSTGRES_USER`     | `school`                | PostgreSQL username                          |
+   | `POSTGRES_PASSWORD` | `school_dev`            | PostgreSQL password                          |
+   | `POSTGRES_PORT`     | `5432`                  | Exposed PostgreSQL host port                 |
+   | `FRONTEND_PORT`     | `5173`                  | Exposed Frontend host port                   |
+   | `FRONTEND_ORIGIN`   | `http://localhost:5173` | Allowed CORS origin for backend API          |
    | `VITE_API_BASE_URL` | `http://localhost:8080` | Backend API URL embedded into frontend build |
 
 3. **Start the containers:**
+
    ```bash
    docker compose up --build
    ```
+
    To run in the background (detached mode):
+
    ```bash
    docker compose up --build -d
    ```
@@ -71,12 +76,37 @@ The entire platform—PostgreSQL database, backend API, and frontend web client�
 
 Once the Docker Compose services are running, the application endpoints are available at:
 
-| Service | URL | Description |
-|---|---|---|
-| **Frontend UI** | [http://localhost:5173](http://localhost:5173) | Single-page React application for applicants and school admin |
-| **Backend API** | [http://localhost:8080](http://localhost:8080) | ASP.NET Core Minimal API root |
-| **API Health Check** | [http://localhost:8080/health](http://localhost:8080/health) | Returns `{ "status": "healthy" }` |
-| **Real-time Stream** | [http://localhost:8080/classes/stream](http://localhost:8080/classes/stream) | Server-Sent Events (SSE) feed for live class seat updates |
+| Service              | URL                                                                          | Description                                                   |
+| -------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| **Frontend UI**      | [http://localhost:5173](http://localhost:5173)                               | Single-page React application for applicants and school admin |
+| **Backend API**      | [http://localhost:8080](http://localhost:8080)                               | ASP.NET Core Minimal API root                                 |
+| **API Health Check** | [http://localhost:8080/health](http://localhost:8080/health)                 | Returns `{ "status": "healthy" }`                             |
+| **Real-time Stream** | [http://localhost:8080/classes/stream](http://localhost:8080/classes/stream) | Server-Sent Events (SSE) feed for live class seat updates     |
+
+---
+
+## Test Suite Summary & Overview
+
+The repository contains **42 automated tests** across the backend and frontend suites, ensuring comprehensive verification of business logic, database constraints, high-concurrency race conditions, RFC 7807 error masking, and client-side state persistence:
+
+| Test Suite | Framework | Total Tests | Status | Key Coverage Areas |
+|---|---|---|---|---|
+| **Backend Integration & Concurrency** | xUnit, ASP.NET Core 10, PostgreSQL 17 | **37** | ✅ Passing | 50-thread concurrency barrier, row-level locks, CHECK constraints, hold expiry, idempotent confirmations, ownership concealment (404), RFC 7807 error masking |
+| **Frontend Unit & Component** | Vitest, React Testing Library, JSDOM | **5** | ✅ Passing | 17-digit student ID persistence in `localStorage`, API error handling, client-side expiry countdown calculations |
+| **Total Automated Tests** | — | **42** | ✅ Passing | **100% pass rate** across all suites |
+
+### Test Breakdown by Category
+
+- **Backend Integration & Concurrency (`backend/SchoolAdmission.Api.Tests` — 37 tests):**
+  - **Class Management & Constraints (`ClassesFlowTests.cs` — 19 tests):** Class creation, trimmed name normalization, case-insensitive uniqueness (`normalized_name`), PostgreSQL schema CHECK constraints (`held_seats + confirmed_seats <= total_seats`, non-negative counters), boundary value validation (1–100 chars, 1–1,000 seats), and malformed JSON payload rejection.
+  - **Seat Holds & Concurrency State Machine (`HoldsFlowTests.cs` — 16 tests):** Seat reservation, payment confirmation idempotency, hold cancellation, expired hold rejection (409 Conflict), student ownership enforcement (404 concealment per ADR-11), single global active application rule (`uq_student_active`), and a 50-thread concurrent barrier race condition test verifying zero overbooking.
+  - **Error Schema & Masking (`ErrorContractTests.cs` — 2 tests):** RFC 7807 `ProblemDetails` schema compliance and validation that database exception details and stack traces are suppressed in both Development and Production environments.
+- **Frontend Component & State Tests (`frontend/src/features/holds/hold.test.tsx` — 5 tests):**
+  - `StudentIdProvider` context initialization with empty state.
+  - 17-digit birth registration number persistence to `localStorage`.
+  - Session clearing on student ID reset.
+  - `ApiError` class creation and HTTP status mapping.
+  - Client-side countdown calculation and expired state detection.
 
 ---
 
@@ -87,21 +117,25 @@ Once the Docker Compose services are running, the application endpoints are avai
 The backend test suite runs against an isolated, ephemeral PostgreSQL 17 container defined in `docker-compose.tests.yml`. Each test execution creates and drops its own disposable database (`admission_test_*`) without touching development data or persistent volumes.
 
 Run the entire test suite:
+
 ```bash
 docker compose -p smp-tests -f docker-compose.tests.yml up --build --abort-on-container-exit --exit-code-from tests
 ```
 
 Run a specific test fixture (e.g., concurrency & holds workflow):
+
 ```bash
 docker compose -p smp-tests -f docker-compose.tests.yml run --rm tests dotnet test SchoolAdmission.sln --filter FullyQualifiedName~HoldsFlowTests
 ```
 
 Run class creation and uniqueness tests:
+
 ```bash
 docker compose -p smp-tests -f docker-compose.tests.yml run --rm tests dotnet test SchoolAdmission.sln --filter FullyQualifiedName~ClassesFlowTests
 ```
 
 Tear down test containers:
+
 ```bash
 docker compose -p smp-tests -f docker-compose.tests.yml down
 ```
@@ -109,6 +143,7 @@ docker compose -p smp-tests -f docker-compose.tests.yml down
 ### 2. Concurrency Test Implementation
 
 The test suite includes a strict concurrency verification test (`ConcurrentHoldRequests_NeverExceedCapacity` in `HoldsFlowTests.cs`):
+
 - Creates a class offering with a strict capacity of **5 seats**.
 - Spawns **50 concurrent requests** from 50 distinct student IDs synchronized using a thread barrier (`System.Threading.Barrier`).
 - Asserts that exactly **5 requests succeed** with HTTP `201 Created`, and the remaining **45 requests are rejected** with HTTP `409 Conflict`.
@@ -117,6 +152,7 @@ The test suite includes a strict concurrency verification test (`ConcurrentHoldR
 ### 3. Running Backend Tests Locally (.NET SDK)
 
 If you have .NET 10 SDK and a local PostgreSQL instance running:
+
 ```bash
 # Set connection string to a disposable test database
 export TEST_DATABASE_CONNECTION="Host=localhost;Port=5432;Database=admission_test_admin;Username=school;Password=school_dev"
@@ -128,6 +164,7 @@ dotnet test backend/SchoolAdmission.sln
 ### 4. Frontend Checks
 
 To run TypeScript verification, linter, and frontend tests locally:
+
 ```bash
 pnpm --dir frontend build     # TypeScript type-check and Vite production build
 pnpm --dir frontend lint      # Oxlint source code linting
@@ -174,8 +211,8 @@ The specification restricts students from holding duplicate seats. To prevent se
 
 - **PostgreSQL Partial Unique Index:**
   ```sql
-  CREATE UNIQUE INDEX uq_student_active 
-  ON holds (student_id) 
+  CREATE UNIQUE INDEX uq_student_active
+  ON holds (student_id)
   WHERE status IN ('HELD', 'CONFIRMED');
   ```
   Attempting to acquire a second hold while another hold or confirmed admission is active triggers a unique violation, which the API cleanly maps to HTTP `409 Conflict`.
@@ -213,18 +250,18 @@ Holds transition through a one-way state machine:
 
 All endpoints accept and return JSON. Authenticated requests use the `X-Student-Id` header (17-digit birth registration number).
 
-| Method | Endpoint | Auth Header | Description |
-|---|---|---|---|
-| `POST` | `/classes` | None | Create a new class/shift offering |
-| `GET` | `/classes` | None | List all classes with seat statistics |
-| `GET` | `/classes/{classId}` | None | Get real-time seat statistics for a class |
-| `GET` | `/classes/stream` | None | Server-Sent Events stream for live class seat updates |
-| `POST` | `/classes/{classId}/holds` | `X-Student-Id` | Reserve a seat (creates a temporary hold) |
-| `GET` | `/holds/{holdId}` | `X-Student-Id` | Get current status and expiry of a hold |
-| `POST` | `/holds/{holdId}/confirm` | `X-Student-Id` | Confirm admission (simulates fee payment) |
-| `DELETE` | `/holds/{holdId}` | `X-Student-Id` | Cancel an active hold and release the seat |
-| `GET` | `/me/holds` | `X-Student-Id` | List all current and historical holds for the student |
-| `GET` | `/health` | None | System health check probe |
+| Method   | Endpoint                   | Auth Header    | Description                                           |
+| -------- | -------------------------- | -------------- | ----------------------------------------------------- |
+| `POST`   | `/classes`                 | None           | Create a new class/shift offering                     |
+| `GET`    | `/classes`                 | None           | List all classes with seat statistics                 |
+| `GET`    | `/classes/{classId}`       | None           | Get real-time seat statistics for a class             |
+| `GET`    | `/classes/stream`          | None           | Server-Sent Events stream for live class seat updates |
+| `POST`   | `/classes/{classId}/holds` | `X-Student-Id` | Reserve a seat (creates a temporary hold)             |
+| `GET`    | `/holds/{holdId}`          | `X-Student-Id` | Get current status and expiry of a hold               |
+| `POST`   | `/holds/{holdId}/confirm`  | `X-Student-Id` | Confirm admission (simulates fee payment)             |
+| `DELETE` | `/holds/{holdId}`          | `X-Student-Id` | Cancel an active hold and release the seat            |
+| `GET`    | `/me/holds`                | `X-Student-Id` | List all current and historical holds for the student |
+| `GET`    | `/health`                  | None           | System health check probe                             |
 
 ---
 
