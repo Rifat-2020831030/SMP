@@ -8,6 +8,14 @@ using Serilog.Formatting.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var port = builder.Configuration["PORT"] ?? builder.Configuration["BACKEND_PORT"];
+if (!string.IsNullOrWhiteSpace(port) &&
+    string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ASPNETCORE_URLS")) &&
+    string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ASPNETCORE_HTTP_PORTS")))
+{
+    builder.WebHost.UseUrls($"http://*:{port}");
+}
+
 builder.Host.UseSerilog((context, configuration) => configuration
     .ReadFrom.Configuration(context.Configuration)
     .Enrich.FromLogContext()
