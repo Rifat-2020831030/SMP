@@ -21,6 +21,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_HTTP_PORTS: 8080
+      HOLD_DURATION_SECONDS: ${HOLD_DURATION_SECONDS:-600}
       ConnectionStrings__Database: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-school_admission};Username=${POSTGRES_USER:-school};Password=${POSTGRES_PASSWORD:-school_dev};Timeout=3;Command Timeout=5"
       Cors__AllowedOrigins__0: ${FRONTEND_ORIGIN:-http://localhost:5173}
     ports:
