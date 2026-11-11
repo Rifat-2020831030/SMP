@@ -10,11 +10,14 @@ namespace SchoolAdmission.Api.Features.Classes;
 
 public static class ClassEndpoints
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
     public static IEndpointRouteBuilder MapClassEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/classes");
         group.MapPost("", CreateAsync);
         group.MapGet("", ListAsync);
+        group.MapGet("/stream", StreamAsync);
         group.MapGet("/{classId}", GetAsync);
         return endpoints;
     }
@@ -70,6 +73,78 @@ public static class ClassEndpoints
 
     private static async Task<IReadOnlyList<ClassSummary>> ListAsync(ClassQueries queries, CancellationToken cancellationToken)
         => await queries.ListAsync(cancellationToken);
+
+    private static async Task StreamAsync(
+        AdmissionDbContext db,
+        IConfiguration config,
+        HttpResponse response,
+        CancellationToken cancellationToken)
+    {
+        response.Headers.ContentType = "text/event-stream";
+        response.Headers.CacheControl = "no-cache";
+        response.Headers.Connection = "keep-alive";
+
+        var connectionString = db.Database.GetConnectionString()
+            ?? config.GetConnectionString("Database")
+            ?? throw new InvalidOperationException("ConnectionStrings:Database is required.");
+
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        await using (var cmd = new NpgsqlCommand("LISTEN admission_classes", connection))
+        {
+            await cmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        async Task SendSnapshotAsync()
+        {
+            var classes = await db.Classes.AsNoTracking()
+                .OrderBy(item => item.Name)
+                .ThenBy(item => item.Id)
+                .Select(item => new ClassSummary(
+                    item.Id,
+                    item.Name,
+                    item.TotalSeats,
+                    item.HeldSeats,
+                    item.ConfirmedSeats,
+                    item.TotalSeats - item.HeldSeats - item.ConfirmedSeats))
+                .ToListAsync(cancellationToken);
+
+            var json = JsonSerializer.Serialize(classes, JsonOptions);
+            await response.WriteAsync($"data: {json}\n\n", cancellationToken);
+            await response.Body.FlushAsync(cancellationToken);
+        }
+
+        await SendSnapshotAsync();
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                await connection.WaitAsync(TimeSpan.FromSeconds(3), cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+                break;
+
+            try
+            {
+                await SendSnapshotAsync();
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (IOException)
+            {
+                break;
+            }
+        }
+    }
 
     private static async Task<Ok<ClassSummary>> GetAsync(
         string classId,
